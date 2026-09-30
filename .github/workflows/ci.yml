@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install fish
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            brew install fish
+          else
+            sudo apt-add-repository -y ppa:fish-shell/release-4
+            sudo apt-get update
+            sudo apt-get install -y fish
+          fi
+      - name: Check formatting
+        run: fish -c 'fish_indent --check functions/*.fish completions/*.fish conf.d/*.fish tests/*.fish hooks/*.fish'
+      - name: Run tests
+        run: fish tests/run.fish
