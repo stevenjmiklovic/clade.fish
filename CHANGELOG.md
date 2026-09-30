@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-30
+
 ### Added
 
 - A Test workflow that lints and runs the suite on fish 3.6 (the minimum), 3.7 and 4,
@@ -27,5 +29,6 @@ All notable changes to this project are documented here. The format follows
 - Distribution as an Oh My Fish package (`omf install https://github.com/stevenjmiklovic/clade.fish`),
   also installable with Fisher.
 
-[Unreleased]: https://github.com/stevenjmiklovic/clade.fish/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/stevenjmiklovic/clade.fish/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/stevenjmiklovic/clade.fish/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/stevenjmiklovic/clade.fish/releases/tag/v0.1.0
