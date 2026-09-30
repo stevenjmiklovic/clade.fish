@@ -1,0 +1,80 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install fish 4
+        run: |
+          sudo apt-add-repository -y ppa:fish-shell/release-4
+          sudo apt-get update
+          sudo apt-get install -y fish
+      - name: Check formatting
+        run: fish -c 'fish_indent --check functions/*.fish completions/*.fish conf.d/*.fish hooks/*.fish tests/*.fish tools/*.fish'
+      - name: Check syntax
+        run: |
+          for f in functions/*.fish completions/*.fish conf.d/*.fish hooks/*.fish tests/*.fish tools/*.fish; do
+            fish --no-execute "$f" || exit 1
+          done
+      - name: Check the version has a changelog entry
+        run: |
+          version=$(sed -n 's/^set -g __clade_version //p' functions/clade.fish)
+          grep -q "^## \[$version\] - " CHANGELOG.md || { echo "CHANGELOG.md has no entry for $version"; exit 1; }
+
+  test:
+    name: test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fish 4, Ubuntu
+            os: ubuntu-latest
+            fish: ppa-4
+          - name: fish 3.7, Ubuntu
+            os: ubuntu-latest
+            fish: ppa-3
+          - name: fish 3.6, Ubuntu (minimum)
+            os: ubuntu-latest
+            fish: source-3.6.4
+          - name: fish 4, macOS
+            os: macos-latest
+            fish: brew
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install fish
+        env:
+          FISH: ${{ matrix.fish }}
+        run: |
+          case "$FISH" in
+            brew)
+              brew install fish ;;
+            ppa-*)
+              sudo apt-add-repository -y "ppa:fish-shell/release-${FISH#ppa-}"
+              sudo apt-get update
+              sudo apt-get install -y fish ;;
+            source-*)
+              version="${FISH#source-}"
+              sudo apt-get update
+              sudo apt-get install -y cmake g++ gettext libpcre2-dev
+              curl -fsSL "https://github.com/fish-shell/fish-shell/releases/download/$version/fish-$version.tar.xz" | tar -xJ
+              cmake -S "fish-$version" -B fish-build -DCMAKE_BUILD_TYPE=Release -DBUILD_DOCS=OFF
+              cmake --build fish-build --parallel
+              sudo cmake --install fish-build
+              rm -rf "fish-$version" fish-build ;;
+          esac
+          fish --version
+      - name: Run tests
+        run: fish tests/run.fish

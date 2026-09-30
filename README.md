@@ -1,5 +1,11 @@
 # clade.fish
 
+[![Test](https://github.com/stevenjmiklovic/clade.fish/actions/workflows/test.yml/badge.svg)](https://github.com/stevenjmiklovic/clade.fish/actions/workflows/test.yml)
+[![Release](https://img.shields.io/github/v/release/stevenjmiklovic/clade.fish)](https://github.com/stevenjmiklovic/clade.fish/releases/latest)
+[![fish 3.6+](https://img.shields.io/badge/fish-3.6%2B-4AAE46?logo=fishshell&logoColor=white)](https://fishshell.com)
+[![Oh My Fish](https://img.shields.io/badge/Oh%20My%20Fish-package-blue)](#install)
+[![License: MIT](https://img.shields.io/github/license/stevenjmiklovic/clade.fish)](LICENSE)
+
 Switch, snapshot and share [Claude Code](https://claude.com/claude-code) profiles from the [fish shell](https://fishshell.com).
 
 A *profile* is a Claude Code config directory: `~/.claude`, or any `~/.<name>claude` directory next to it. Each profile has its own settings, `CLAUDE.md`, skills, agents, plugins, history and login. `clade` switches between them by managing [`CLAUDE_CONFIG_DIR`](https://code.claude.com/docs/en/settings). It can also version a profile's config with snapshots and move it between profiles and machines as an archive.
@@ -30,7 +36,7 @@ Saved snapshot 20260930T185201Z of notclaude.
 
 ## Install
 
-Requires fish 3.6 or newer (developed and tested on fish 4.9), `jq` (for snapshots, export and import), and `tar`.
+Requires fish 3.6 or newer (tested on 3.6, 3.7 and 4), `jq` (for snapshots, export and import), and `tar`.
 
 With [Oh My Fish](https://github.com/oh-my-fish/oh-my-fish):
 
@@ -197,7 +203,17 @@ fish_indent --check **/*.fish              # formatting
 
 `tests/run.fish` sets `HOME`, `XDG_CONFIG_HOME` and `XDG_DATA_HOME` to a temporary directory, so the suite never touches your real profiles, snapshots or universal variables. The malicious-archive tests need `python3` and are skipped without it.
 
-Versions follow [Semantic Versioning](https://semver.org). The archive format has its own `format` number, and newer releases are meant to keep importing archives made by older ones. See [CHANGELOG.md](CHANGELOG.md).
+The [Test workflow](.github/workflows/test.yml) runs on every push to `main` and every pull request. It checks formatting and syntax, checks that the current version has a changelog entry, and runs the suite on fish 3.6 (built from source, the minimum supported version), fish 3.7 and fish 4 on Ubuntu, and fish 4 on macOS.
+
+### Releasing
+
+Versions follow [Semantic Versioning](https://semver.org). The archive format has its own `format` number, and newer releases are meant to keep importing archives made by older ones.
+
+1. As you work, add notes under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
+2. Run the **Release** workflow from the Actions tab (or `gh workflow run release.yml -f version=minor`). Choose `patch`, `minor`, `major` or an exact `X.Y.Z`, and tick **dry run** to preview the release first.
+3. The workflow runs the full test matrix. It then bumps `__clade_version`, moves the Unreleased notes under the new version, commits `Release vX.Y.Z` to `main`, tags `vX.Y.Z` and publishes a GitHub release with those notes. OMF users get the new version with `omf update clade.fish`.
+
+The same bump runs locally without GitHub: `fish tools/release.fish minor --dry-run`.
 
 ## License
 

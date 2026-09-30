@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A Test workflow that lints and runs the suite on fish 3.6 (the minimum), 3.7 and 4,
+  on Ubuntu and macOS.
+- A manually dispatched Release workflow that bumps the version, rolls the changelog,
+  tags and publishes a GitHub release (with a dry-run option), plus `tools/release.fish`.
+- Status, release, license and fish-version badges in the README.
+
 ## [0.1.0] - 2026-09-30
 
 ### Added
@@ -18,3 +26,6 @@ All notable changes to this project are documented here. The format follows
 - Built-in help for every command, and completions.
 - Distribution as an Oh My Fish package (`omf install https://github.com/stevenjmiklovic/clade.fish`),
   also installable with Fisher.
+
+[Unreleased]: https://github.com/stevenjmiklovic/clade.fish/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/stevenjmiklovic/clade.fish/releases/tag/v0.1.0
