@@ -268,7 +268,7 @@ Versions follow [Semantic Versioning](https://semver.org). The archive format ha
 
 1. As you work, add notes under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
 2. Run the **Release** workflow from the Actions tab (or `gh workflow run release.yml -f version=minor`). Choose `patch`, `minor`, `major` or an exact `X.Y.Z`, and tick **dry run** to preview the release first.
-3. The workflow runs the full test matrix. It then bumps `__clade_version`, moves the Unreleased notes under the new version, commits `Release vX.Y.Z` to `main`, tags `vX.Y.Z` and publishes a GitHub release with those notes. OMF users get the new version with `omf update clade.fish`.
+3. The workflow runs the full test matrix. It then bumps `__clade_version`, moves the Unreleased notes under the new version, commits `Release vX.Y.Z` to `main` through GitHub's API (so GitHub signs it, and the workflow checks it's Verified), tags `vX.Y.Z` and publishes a GitHub release with those notes. All other commits are GPG-signed by their authors. OMF users get the new version with `omf update clade.fish`.
 
 The same bump runs locally without GitHub: `fish tools/release.fish minor --dry-run`.
 

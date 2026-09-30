@@ -63,19 +63,24 @@ jobs:
             git diff
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Commit, tag and push
-        if: ${{ !inputs.dry-run }}
-        env:
-          VERSION: ${{ steps.bump.outputs.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "Release v$VERSION"
-          git tag -a "v$VERSION" -m "clade $VERSION"
-          git push --atomic origin HEAD:main "v$VERSION"
-      - name: Publish GitHub release
+      - name: Commit (signed by GitHub), tag and publish
         if: ${{ !inputs.dry-run }}
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.bump.outputs.version }}
-        run: gh release create "v$VERSION" --verify-tag --title "clade $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+        run: |
+          # Commit through the GraphQL API so GitHub signs it: a commit pushed from Actions with git is unsigned.
+          additions=$(git diff --name-only | while read -r f; do
+            jq -n --arg path "$f" --arg contents "$(base64 -w0 "$f")" '{path: $path, contents: $contents}'
+          done | jq -s .)
+          jq -n --arg repo "$GITHUB_REPOSITORY" --arg head "$(git rev-parse HEAD)" \
+            --arg headline "Release v$VERSION" --argjson additions "$additions" \
+            '{query: "mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }",
+              variables: {input: {branch: {repositoryNameWithOwner: $repo, branchName: "main"}, expectedHeadOid: $head,
+                                  message: {headline: $headline}, fileChanges: {additions: $additions}}}}' >"$RUNNER_TEMP/commit.json"
+          oid=$(gh api graphql --input "$RUNNER_TEMP/commit.json" --jq '.data.createCommitOnBranch.commit.oid // empty')
+          if [ -z "$oid" ]; then echo "Could not create the release commit."; exit 1; fi
+          verified=$(gh api "repos/$GITHUB_REPOSITORY/commits/$oid" --jq '.commit.verification.verified')
+          echo "Release commit $oid, signature verified: $verified"
+          if [ "$verified" != true ]; then echo "The release commit is not signed; not publishing."; exit 1; fi
+          gh release create "v$VERSION" --target "$oid" --title "clade $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
