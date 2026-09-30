@@ -8,6 +8,9 @@
 
 Switch, snapshot and share [Claude Code](https://claude.com/claude-code) profiles from the [fish shell](https://fishshell.com).
 
+[Read the documentation](https://stevenjmiklovic.github.io/clade.fish/) for installation,
+guided examples and a searchable command reference.
+
 A *profile* is a Claude Code config directory: `~/.claude`, or any `~/.<name>claude` directory next to it. Each profile has its own settings, `CLAUDE.md`, skills, agents, plugins, history and login. `clade` switches between them by managing [`CLAUDE_CONFIG_DIR`](https://code.claude.com/docs/en/settings). It can also version a profile's config with snapshots and move it between profiles and machines as an archive.
 
 ```console
@@ -268,6 +271,18 @@ Versions follow [Semantic Versioning](https://semver.org). The archive format ha
 3. The workflow runs the full test matrix. It then bumps `__clade_version`, moves the Unreleased notes under the new version, commits `Release vX.Y.Z` to `main`, tags `vX.Y.Z` and publishes a GitHub release with those notes. OMF users get the new version with `omf update clade.fish`.
 
 The same bump runs locally without GitHub: `fish tools/release.fish minor --dry-run`.
+
+### Documentation site
+
+The documentation is a self-contained static site in `docs/`. Preview it locally with
+`python3 -m http.server 4173 --directory docs`, then open `http://localhost:4173`.
+No build step or dependency installation is needed.
+
+In the repository's **Settings → Pages**, set the publishing source to **GitHub Actions**
+(once). The **Documentation** workflow publishes `docs/` when documentation changes
+reach `main`, and can also be run manually from the Actions tab. The site lives at
+<https://stevenjmiklovic.github.io/clade.fish/>. Keep examples and command descriptions
+in sync with the built-in help when changing the tool.
 
 ## License
 

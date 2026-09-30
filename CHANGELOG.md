@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A responsive documentation site with installation tabs, copyable examples, a
+  searchable command reference, and automatic publishing to GitHub Pages.
 - GPG encryption of snapshots: `clade encryption [status | on KEY... | off]`. Keys are accepted only
   when their private key is present and a test encrypt/decrypt succeeds. Every encrypted snapshot is
   checked to decrypt before it is kept, and labels live in an unencrypted sidecar so `history` never

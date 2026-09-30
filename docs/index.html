@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Switch, snapshot, and share Claude Code profiles from the fish shell. Installation, examples, and a complete clade command reference.">
+  <meta name="theme-color" content="#f7f9fc">
+  <title>clade.fish — Claude Code profiles for fish</title>
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/style.css">
+  <script src="./assets/script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to documentation</a>
+  <header class="header">
+    <a class="brand" href="#overview" aria-label="clade.fish overview"><img src="./assets/favicon.svg" width="32" height="32" alt=""><span>clade<span class="brand-suffix">.fish</span></span></a>
+    <span class="header-label">Documentation</span>
+    <div class="header-actions">
+      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="command-search" type="search" placeholder="Find a command…" aria-label="Find a command" aria-controls="command-list"><kbd>/</kbd></label>
+      <a class="github-link" href="https://github.com/stevenjmiklovic/clade.fish">GitHub <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="guide-nav">Guide</button>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" id="guide-nav">
+      <nav aria-label="Documentation">
+        <p class="nav-group">Get started</p>
+        <a href="#overview" aria-current="location">Overview</a>
+        <a href="#installation">Installation</a>
+        <a href="#quick-start">Quick start</a>
+        <p class="nav-group">The guide</p>
+        <a href="#profiles">Working with profiles</a>
+        <a href="#snapshots">Snapshots &amp; restore</a>
+        <a href="#sharing">Export &amp; import</a>
+        <a href="#encryption">Encryption</a>
+        <a href="#safety">Safety &amp; secrets</a>
+        <p class="nav-group">Reference</p>
+        <a href="#commands">Commands <span>16</span></a>
+        <a href="#configuration">Configuration</a>
+        <a href="#prompt">Prompt integration</a>
+        <a href="#uninstall">Uninstall</a>
+      </nav>
+      <div class="sidebar-note"><span class="shell-symbol">&gt;_</span><p>A small tool.<br>A familiar shell.</p><a href="https://fishshell.com">Made for fish 3.6+</a></div>
+    </aside>
+    <main id="main">
+      <section class="hero" id="overview" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <div class="compatibility"><span></span> A fish shell tool for Claude Code</div>
+          <h1 id="hero-title">A <span class="hero-fish">fish</span> for<br>every Claude.</h1>
+          <p class="hero-description">Keep work, personal, and experimental profiles in their own space. Switch between them, save a snapshot, and take your config with you.</p>
+          <div class="hero-actions"><a class="button primary" href="#installation">Install clade</a><a class="text-link" href="#quick-start">Try the quick start <span aria-hidden="true">↘</span></a></div>
+        </div>
+        <div class="terminal" aria-label="Example: switch to a work profile and save a snapshot">
+          <div class="terminal-header"><span class="terminal-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>fish</span><span>~</span></div>
+          <pre><code><span class="terminal-comment"># Give each context its own config</span>
+<span class="terminal-prompt">❯</span> clade
+<span class="terminal-active">* claude</span>       <span class="terminal-muted">~/.claude</span>
+  workclaude   <span class="terminal-muted">~/.workclaude</span>
+
+<span class="terminal-prompt">❯</span> clade use work
+<span class="terminal-output">Claude profile: workclaude</span>
+
+<span class="terminal-prompt">❯</span> clade snapshot -m <span class="terminal-string">"a good place"</span>
+<span class="terminal-output">Saved snapshot … of workclaude.</span>
+<span class="terminal-prompt">❯</span> <span class="cursor" aria-hidden="true"></span></code></pre>
+          <div class="terminal-footer"><span class="profile-dot"></span> workclaude <span>One shell. Your chosen context.</span></div>
+        </div>
+        <div class="workflow-summary">
+          <a href="#profiles"><span class="feature-icon" aria-hidden="true">⇄</span><div><strong>Switch your context</strong><p>Separate settings, skills, and logins.</p></div></a>
+          <a href="#snapshots"><span class="feature-icon" aria-hidden="true">↶</span><div><strong>Keep a way back</strong><p>Snapshot before you experiment.</p></div></a>
+          <a href="#sharing"><span class="feature-icon" aria-hidden="true">↗</span><div><strong>Take your config along</strong><p>Portable archives, ready to import.</p></div></a>
+        </div>
+      </section>
+      <div class="doc-body">
+        <section id="installation" aria-labelledby="installation-title">
+          <div class="section-heading"><h2 id="installation-title">Installation</h2><a class="heading-link" href="#installation" aria-label="Link to Installation">#</a></div>
+          <p>You’ll need <strong>fish 3.6 or newer</strong>, <code>jq</code> for snapshots and archives, and <code>tar</code>. Choose your fish package manager.</p>
+          <p class="detail">Optional encryption uses GnuPG for snapshots and <a href="https://github.com/getsops/sops">sops</a> 3.9 or newer for exports.</p>
+          <div class="install-tabs" role="tablist" aria-label="Installation method">
+            <button id="tab-omf" type="button" role="tab" aria-selected="true" aria-controls="install-omf">Oh My Fish</button>
+            <button id="tab-fisher" type="button" role="tab" aria-selected="false" aria-controls="install-fisher" tabindex="-1">Fisher</button>
+            <button id="tab-manual" type="button" role="tab" aria-selected="false" aria-controls="install-manual" tabindex="-1">Manual</button>
+          </div>
+          <div id="install-omf" role="tabpanel" aria-labelledby="tab-omf" tabindex="0">
+            <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code>omf install https://github.com/stevenjmiklovic/clade.fish</code></pre></div>
+            <p class="detail">Open a new shell after installing, or run <code>exec fish</code>. The package is called <code>clade.fish</code>; the command is <code>clade</code>. Upgrade later with <code>omf update clade.fish</code>.</p>
+          </div>
+          <div id="install-fisher" role="tabpanel" aria-labelledby="tab-fisher" tabindex="0" hidden>
+            <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code>fisher install stevenjmiklovic/clade.fish</code></pre></div>
+            <p class="detail">Install with <a href="https://github.com/jorgebucaran/fisher">Fisher</a>, then run <code>clade</code> to list your profiles.</p>
+          </div>
+          <div id="install-manual" role="tabpanel" aria-labelledby="tab-manual" tabindex="0" hidden>
+            <p>Clone the repository and link its files into your fish config. Create the destination folders if they don’t exist.</p>
+            <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code>git clone https://github.com/stevenjmiklovic/clade.fish.git
+cd clade.fish
+mkdir -p ~/.config/fish/{functions,completions,conf.d}
+for f in functions/*.fish completions/*.fish conf.d/*.fish
+    ln -s $PWD/$f ~/.config/fish/$f
+end</code></pre></div>
+          </div>
+          <noscript><p>Fisher: <code>fisher install stevenjmiklovic/clade.fish</code>. For manual installation, see the <a href="https://github.com/stevenjmiklovic/clade.fish#install">README</a>.</p></noscript>
+        </section>
+        <section id="quick-start" aria-labelledby="quick-start-title">
+          <div class="section-heading"><h2 id="quick-start-title">Your first profile</h2><a class="heading-link" href="#quick-start" aria-label="Link to Quick start">#</a></div>
+          <p>Start with a copy of your stock config. Switch to it, then log in once. Each profile keeps its own Claude Code login.</p>
+          <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code><span class="comment"># Create ~/.workclaude with your portable config</span>
+clade new work --from claude
+clade use work
+claude
+
+<span class="comment"># Use work in new shells, too</span>
+clade use -u work
+
+<span class="comment"># Run once with the stock profile, without switching</span>
+clade run claude -p "hello"</code></pre></div>
+          <div class="note"><span aria-hidden="true">↳</span><p>Back to your usual setup? Run <code>clade use claude</code>. To reset the default for new shells, run <code>clade default claude</code>.</p></div>
+        </section>
+        <section id="profiles" aria-labelledby="profiles-title">
+          <div class="section-heading"><h2 id="profiles-title">Working with profiles</h2><a class="heading-link" href="#profiles" aria-label="Link to Profiles">#</a></div>
+          <p>A profile is a Claude Code config directory: <code>~/.claude</code>, or a directory like <code>~/.workclaude</code>. Each has its own settings, <code>CLAUDE.md</code>, skills, agents, plugins, history, and login.</p>
+          <p>clade discovers directories matching <code>~/.*claude</code>. Short names work: <code>work</code> resolves to <code>workclaude</code>. You can also use a path, such as <code>clade use ./sandbox/testclaude</code>.</p>
+          <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code>clade                  <span class="comment"># List profiles; * marks the active one</span>
+clade current          <span class="comment"># Show this shell’s profile</span>
+cd (clade path work)    <span class="comment"># Open its config directory</span>
+clade default work     <span class="comment"># Set the default for new shells</span></code></pre></div>
+          <h3>What switching changes</h3>
+          <p><code>clade use</code> sets <code>CLAUDE_CONFIG_DIR</code> for this shell and the programs it starts. Already running Claude Code sessions keep their current profile. A child shell that inherits this variable keeps the same profile, even if you’ve set a different default.</p>
+          <div class="note"><span aria-hidden="true">↳</span><p>The stock <code>claude</code> profile is special: clade <strong>unsets</strong> <code>CLAUDE_CONFIG_DIR</code> so Claude Code uses your existing <code>~/.claude.json</code> and login.</p></div>
+        </section>
+        <section id="snapshots" aria-labelledby="snapshots-title">
+          <div class="section-heading"><h2 id="snapshots-title">Snapshots &amp; restore</h2><a class="heading-link" href="#snapshots" aria-label="Link to Snapshots">#</a></div>
+          <p>Save a known-good config before changing hooks, skills, or settings. A snapshot is a timestamped archive of your <a href="#portable-config">portable config</a>.</p>
+          <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code>clade snapshot work -m "before plugin cleanup"
+clade history work
+clade diff work        <span class="comment"># Compare with the newest snapshot</span>
+clade restore work 2   <span class="comment"># Restore the second-newest snapshot</span>
+clade restore work 1   <span class="comment"># Undo that restore</span></code></pre></div>
+          <p><code>SNAP</code> can be a number from <code>clade history</code> (<code>1</code> is newest), or a snapshot ID such as <code>20260930T185201Z</code>. clade snapshots the current state before restoring. Files created since the saved snapshot stay in place and are listed.</p>
+          <p>Snapshots live in <code>~/.local/share/clade/snapshots/&lt;profile&gt;/</code>, or your configured data directory. They keep secrets, use private permissions (<code>600</code> files in a <code>700</code> directory), and are never automatically deleted. You can <a href="#encryption">encrypt new snapshots with GPG</a>.</p>
+          <p class="detail">For scripts, <code>clade diff</code> exits <code>0</code> when identical, <code>1</code> when changed, and <code>2</code> on error.</p>
+        </section>
+        <section id="sharing" aria-labelledby="sharing-title">
+          <div class="section-heading"><h2 id="sharing-title">Export &amp; import</h2><a class="heading-link" href="#sharing" aria-label="Link to Export and import">#</a></div>
+          <p>Move a setup to another machine, or share it with a teammate. Export writes a self-contained <code>.clade.tar.gz</code> archive and redacts secret-looking environment values by default.</p>
+          <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code><span class="comment"># On the first machine</span>
+clade export work -o work.clade.tar.gz
+
+<span class="comment"># On the other machine</span>
+clade import work.clade.tar.gz work
+clade use work
+claude                 <span class="comment"># Log in for this profile</span></code></pre></div>
+          <h3 id="portable-config">What travels with your profile</h3>
+          <div class="portable-grid"><div><h4><span aria-hidden="true">✓</span> Portable config</h4><ul><li><code>settings.json</code>, <code>CLAUDE.md</code>, <code>keybindings.json</code></li><li><code>agents/</code>, <code>commands/</code>, <code>skills/</code>, <code>output-styles/</code></li><li><code>hooks/</code>, <code>rules/</code>, and paths in <code>$clade_include</code></li></ul></div><div><h4><span aria-hidden="true">−</span> Stays on the machine</h4><ul><li><code>.claude.json</code>, credentials, and logins</li><li>History, projects, sessions, and todos</li><li>Caches, logs, file history, shell snapshots, and <code>plugins/</code></li></ul></div></div>
+          <p>Snapshots and <code>new --from</code> use the same portable config list. Enabled plugins and extra marketplaces travel in <code>settings.json</code>; plugin caches and registries don’t. If plugins are missing after import, run <code>/plugin</code> in Claude Code.</p>
+          <p>When you import or copy under a new name, clade rewrites references to the old profile directory in <code>settings.json</code>. Exports follow symlinks to make archives self-contained. Imports validate the archive before writing.</p>
+          <h3>Merge into an existing profile</h3>
+          <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code>clade import work.clade.tar.gz work --merge</code></pre></div>
+          <p>A merge snapshots the target first, adds and replaces portable files, and leaves all other files in place. Without <code>--merge</code>, import refuses an existing profile.</p>
+          <details><summary>Inside a clade archive</summary><p>A gzipped tar contains the portable files and a <code>clade.json</code> manifest with format version, clade version, profile name, source directory, home directory, timestamp, label, and redacted env names. Plain archives use format <code>1</code>; exports with sops-encrypted secrets use format <code>2</code>, which clade 0.2 and earlier refuse.</p></details>
+        </section>
+        <section id="encryption" aria-labelledby="encryption-title">
+          <div class="section-heading"><h2 id="encryption-title">Encryption</h2><a class="heading-link" href="#encryption" aria-label="Link to Encryption">#</a></div>
+          <p>Use GPG to protect whole snapshot archives, or sops to encrypt secret-looking environment values in an export’s <code>settings.json</code>.</p>
+          <h3>Encrypt snapshots with GPG</h3>
+          <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code>clade encryption on you@example.com  <span class="comment"># Or a key ID or fingerprint</span>
+clade encryption                     <span class="comment"># Check keys and snapshot counts</span>
+clade encryption off                 <span class="comment"># Stop encrypting new snapshots</span></code></pre></div>
+          <p>Enabling checks that the private key is present and a test encryption and decryption succeeds. Every new snapshot, including automatic backups before restore and merge, is saved as <code>.tar.gz.gpg</code> and checked by decrypting it before it is kept.</p>
+          <p><code>history</code> reads labels from a small sidecar file without a passphrase. <code>diff</code> and <code>restore</code> decrypt into a private temporary directory. For terminal pinentry, set <code>set -gx GPG_TTY (tty)</code>.</p>
+          <div class="note caution"><span aria-hidden="true">!</span><p>Back up your private key somewhere other than this machine. Losing it makes encrypted snapshots unrecoverable. Existing snapshots stay as they are; enabling encryption doesn’t encrypt old ones. Missing keys stop restore and merge before the profile changes.</p></div>
+          <h3>Encrypt export secrets with sops</h3>
+          <p>Configure recipients with sops environment variables, a <code>.sops.yaml</code> file, or <code>clade_sops_args</code>. For example, replace <code>FINGERPRINT</code> with your recipient’s PGP fingerprint:</p>
+          <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code>set -U clade_sops_args --pgp FINGERPRINT
+clade export work --sops -o work.clade.tar.gz
+clade import work.clade.tar.gz work</code></pre></div>
+          <p><code>--sops</code> replaces redaction with encrypted <code>ENC[…]</code> values. Other settings stay readable. Recipients can use PGP, age, AWS KMS, GCP KMS, Azure Key Vault, or Vault; multiple recipients can open the same archive.</p>
+          <p>clade checks that every matching secret value was encrypted before writing the export. Import needs a recipient key and decrypts before creating or changing a profile. An export with no matching secrets stays plain, in format <code>1</code>.</p>
+        </section>
+        <section id="safety" aria-labelledby="safety-title">
+          <div class="section-heading"><h2 id="safety-title">Safety &amp; secrets</h2><a class="heading-link" href="#safety" aria-label="Link to Safety">#</a></div>
+          <p>clade keeps a way back when it changes an existing profile. Here’s what to expect:</p>
+          <ul class="safety-list"><li><strong>A snapshot before changes.</strong> Restore and import with <code>--merge</code> stop if the backup fails.</li><li><strong>No profile deletion.</strong> Restore and merge only add or replace files. New profiles and exports refuse existing destinations.</li><li><strong>Validated imports.</strong> Archives with absolute paths, <code>..</code>, links, special files, or paths outside the portable config list are rejected.</li><li><strong>Machine state stays put.</strong> Credentials, history, sessions, and projects aren’t copied into archives or written over.</li></ul>
+          <h3>Redaction has a specific scope</h3>
+          <p>On export, values in <code>settings.json</code>’s <code>env</code> object are replaced with <code>&lt;redacted by clade&gt;</code> when their names contain <code>KEY</code>, <code>TOKEN</code>, <code>SECRET</code>, <code>PASSW</code>, <code>CREDENTIAL</code>, or <code>BEARER</code>, case-insensitively. Import lists those names so you can fill them in.</p>
+          <div class="note caution"><span aria-hidden="true">!</span><p>Review an archive before sharing. Secrets elsewhere, such as inside a hook command, aren’t detected. <code>--include-secrets</code> disables export redaction; <code>--sops</code> encrypts matching values instead. Snapshots retain secret values, and can be protected with GPG.</p></div>
+          <p>If <code>settings.json</code> can’t be parsed, export stops.</p>
+        </section>
+        <section id="commands" aria-labelledby="commands-title">
+          <div class="section-heading"><h2 id="commands-title">Command reference</h2><a class="heading-link" href="#commands" aria-label="Link to Commands">#</a></div>
+          <p>Use <code>clade help COMMAND</code> or <code>clade COMMAND -h</code> for built-in help. Optional <code>NAME</code> arguments default to your active profile, except on import, which uses the name in the archive.</p>
+          <p id="search-status" class="detail" role="status" aria-live="polite"></p>
+          <div id="command-list" class="command-list">
+            <article class="command" id="command-list-profiles"><h3><code>clade list [-s]</code></h3><p>List profiles. <code>*</code> marks the active profile; <code>-s</code> prints bare names. Running <code>clade</code> alone also lists profiles.</p></article>
+            <article class="command" id="command-use"><h3><code>clade use [-u] NAME</code></h3><p>Switch this shell to a profile. <code>-u</code> also sets the default for new shells.</p></article>
+            <article class="command" id="command-current"><h3><code>clade current</code></h3><p>Print the active profile name, or its path if it lives outside your home directory.</p></article>
+            <article class="command" id="command-path"><h3><code>clade path [NAME]</code></h3><p>Print a profile’s directory. Use <code>cd (clade path work)</code> to open it.</p></article>
+            <article class="command" id="command-default"><h3><code>clade default [NAME]</code></h3><p>Show or set the profile new shells start with.</p></article>
+            <article class="command" id="command-run"><h3><code>clade run NAME [ARGS...]</code></h3><p>Run <code>claude</code> once with a profile without switching this shell. All arguments after <code>NAME</code> go to Claude Code.</p></article>
+            <article class="command" id="command-new"><h3><code>clade new NAME [--from SRC]</code></h3><p>Create <code>~/.NAMEclaude</code>, optionally copying another profile’s portable config.</p></article>
+            <article class="command" id="command-snapshot"><h3><code>clade snapshot [NAME] [-m MSG]</code></h3><p>Save portable config as a snapshot with an optional message.</p></article>
+            <article class="command" id="command-history"><h3><code>clade history [NAME]</code></h3><p>List snapshots, newest first, with their number, ID, size, and label.</p></article>
+            <article class="command" id="command-diff"><h3><code>clade diff [NAME] [SNAP]</code></h3><p>Compare a saved snapshot with the current config. <code>SNAP</code> defaults to <code>1</code>, the newest.</p></article>
+            <article class="command" id="command-restore"><h3><code>clade restore NAME [SNAP]</code></h3><p>Restore a snapshot, saving the current state first. Newer files stay in place.</p></article>
+            <article class="command" id="command-encryption"><h3><code>clade encryption [status | on KEY... | off]</code></h3><p>Show encryption status, enable GPG encryption of new snapshots, or turn it off. Keys must have an available private key and pass an encryption and decryption check.</p></article>
+            <article class="command" id="command-export"><h3><code>clade export [NAME] [-o FILE] [--sops | --include-secrets]</code></h3><p>Export config to an archive. The default filename is <code>NAME-YYYYMMDD.clade.tar.gz</code>. Secret-looking env values are redacted by default, encrypted with <code>--sops</code>, or kept with <code>--include-secrets</code>.</p></article>
+            <article class="command" id="command-import"><h3><code>clade import FILE [NAME] [--merge]</code></h3><p>Import an archive into a new profile, or merge into an existing one. <code>NAME</code> defaults to the name in the archive.</p></article>
+            <article class="command" id="command-help"><h3><code>clade help [COMMAND]</code></h3><p>Show general help or help for one command. <code>-h</code> and <code>--help</code> work too.</p></article>
+            <article class="command" id="command-version"><h3><code>clade version</code></h3><p>Print the installed clade version. Also available as <code>-v</code> or <code>--version</code>.</p></article>
+          </div>
+          <p class="detail">Aliases: <code>ls</code> for <code>list</code> and <code>log</code> for <code>history</code>.</p>
+        </section>
+        <section id="configuration" aria-labelledby="configuration-title">
+          <div class="section-heading"><h2 id="configuration-title">Configuration</h2><a class="heading-link" href="#configuration" aria-label="Link to Configuration">#</a></div>
+          <p>Configure clade with fish variables. Use <code>set -U</code> when you want a value to persist across shells.</p>
+          <div class="table-scroll" role="region" aria-label="Configuration variables" tabindex="0"><table><thead><tr><th scope="col">Variable</th><th scope="col">Default &amp; purpose</th></tr></thead><tbody>
+            <tr><th scope="row"><code>clade_default</code></th><td>Unset (stock <code>claude</code>). The default for new shells; set it with <code>clade default</code>.</td></tr>
+            <tr><th scope="row"><code>clade_data_dir</code></th><td><code>$XDG_DATA_HOME/clade</code> or <code>~/.local/share/clade</code>. Snapshot storage.</td></tr>
+            <tr><th scope="row"><code>clade_include</code></th><td>None. Extra paths inside a profile to include as portable config.</td></tr>
+            <tr><th scope="row"><code>clade_secret_pattern</code></th><td><code>KEY|TOKEN|SECRET|PASSW|CREDENTIAL|BEARER</code>. Case-insensitive regex for env names redacted or encrypted on export.</td></tr>
+            <tr><th scope="row"><code>clade_gpg_recipients</code></th><td>Unset. GPG fingerprints for new snapshots. Set with <code>clade encryption on</code>.</td></tr>
+            <tr><th scope="row"><code>clade_sops_args</code></th><td>None. Extra <code>sops encrypt</code> flags, such as <code>--pgp FINGERPRINT</code> or <code>--age RECIPIENT</code>.</td></tr>
+          </tbody></table></div>
+          <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code>set -U clade_include statusline.sh</code></pre></div>
+        </section>
+        <section id="prompt" aria-labelledby="prompt-title">
+          <div class="section-heading"><h2 id="prompt-title">Put your profile in your prompt</h2><a class="heading-link" href="#prompt" aria-label="Link to Prompt integration">#</a></div>
+          <p>With <a href="https://starship.rs">Starship</a>, add this to your <code>starship.toml</code>:</p>
+          <div class="code-block"><div class="code-label">toml <button type="button" class="copy-button">Copy</button></div><pre><code>[env_var.CLAUDE_CONFIG_DIR]
+format = "[✻ $env_value]($style) "
+style = "yellow"</code></pre></div>
+          <p>In a fish prompt, use <code>clade current</code>. Check <code>set -q CLAUDE_CONFIG_DIR</code> to show a profile indicator only when using a non-stock profile.</p>
+        </section>
+        <section id="uninstall" aria-labelledby="uninstall-title">
+          <div class="section-heading"><h2 id="uninstall-title">Uninstall</h2><a class="heading-link" href="#uninstall" aria-label="Link to Uninstall">#</a></div>
+          <div class="code-block"><div class="code-label">fish <button type="button" class="copy-button">Copy</button></div><pre><code>omf remove clade.fish
+<span class="comment"># Or, with Fisher:</span>
+fisher remove stevenjmiklovic/clade.fish</code></pre></div>
+          <p>Uninstalling removes the saved default. Your profiles and snapshots stay where they are.</p>
+        </section>
+        <footer class="footer"><div><a class="footer-brand" href="#overview">clade.fish</a><p>Keep your contexts close. Keep them separate.</p></div><div><a href="https://github.com/stevenjmiklovic/clade.fish">Source &amp; development</a><a href="https://github.com/stevenjmiklovic/clade.fish/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/stevenjmiklovic/clade.fish/blob/main/LICENSE">MIT license</a></div></footer>
+      </div>
+    </main>
+  </div>
+  <div id="copy-status" class="sr-only" role="status" aria-live="polite"></div>
+</body>
+</html>
