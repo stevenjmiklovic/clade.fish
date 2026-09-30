@@ -1,0 +1,29 @@
+{
+  "skill_name": "fish-shell",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a fish 4.9.3 function named ctxrun that accepts a profile name followed by arbitrary arguments for a program called assistant-cli. Map work to ~/.workassistant and personal to ~/.personalassistant. The stock profile must run with ASSISTANT_CONFIG_DIR unset. Print ctxrun's help only when -h or --help is its first argument, and preserve every downstream argument, including spaces, empty strings, and --help. Do not change the calling shell's active environment or saved defaults. Save the function and verify forwarding with a stub in a disposable test environment.",
+      "expected_output": "A native fish function with an explicit wrapper boundary, unchanged downstream argv, one-off child environment, useful error/help behavior, and isolated behavioral verification.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Build a small fish plugin called workctx for fish 3.6+ with functions/, completions/, and conf.d/. It should select the work or personal context in the current shell using WORKCTX_DIR, and support an explicitly saved default for future shells. Inherited WORKCTX_DIR must take precedence at startup. Include subcommand completions, built-in help, and an uninstall hook that removes only its saved preference. Verify current-shell behavior, fresh-shell autoloading, and inherited versus saved defaults without touching my real fish configuration.",
+      "expected_output": "Coherent plugin files with intentional global/exported/universal scope, noninteractive startup/completions, documented lifecycle, and sandboxed current/fresh-shell checks.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Implement a fish 4.9.3 profile importer named cfgimport for a format containing only settings.json and skills/ in a tar.gz archive. Refuse an existing destination. Validate the entire archive before installing a new profile, and reject traversal, absolute paths, symlinks, hard links, and special files. You may use Python 3 for archive validation and staging if it makes the boundary safer. Add tests using synthetic config and a disposable home, including an archive where a valid member precedes an invalid one, and prove that rejection leaves no destination or partial files. Keep the solution small and document its dependencies.",
+      "expected_output": "An importer with a defined archive validation boundary, private staging, overwrite refusal, preserved failures, and checks that invalid archives leave the target unchanged.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Port this Bash function to fish 4.9.3. Keep the empty/unset profile fallback, every forwarded argument, the exit status of runner, and the cleanup behavior. Do not change my real environment or defaults. Show the corresponding entries in your Bash-to-fish conversion key and verify with a stub in an isolated environment. Bash source:\nrunprofile() {\n  local selected=\"${TOOL_PROFILE:-work}\"\n  local args=(--profile \"$selected\" \"$@\")\n  local scratch\n  scratch=$(mktemp -d) || return\n  runner \"${args[@]}\" --scratch \"$scratch\"\n  local rc=$?\n  rm -rf -- \"$scratch\"\n  return \"$rc\"\n}",
+      "expected_output": "A native fish function preserving scalar fallback semantics, argv element boundaries, temporary resource ownership, and the runner status even if cleanup succeeds; isolated checks cover unset/empty profile, a spaced argument, an empty argument, downstream --help, and runner failure.",
+      "files": []
+    }
+  ]
+}
