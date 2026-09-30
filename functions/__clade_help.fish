@@ -19,9 +19,10 @@ Versions
   history [NAME]                 List snapshots, newest first
   diff [NAME] [SNAP]             Compare NAME with a snapshot
   restore NAME [SNAP]            Roll NAME back to a snapshot
+  encryption [on KEY... | off]   Show or set GPG encryption of snapshots
 
 Sharing
-  export [NAME] [-o FILE] [--include-secrets]
+  export [NAME] [-o FILE] [--sops | --include-secrets]
                                  Write NAME's config to an archive
   import FILE [NAME] [--merge]   Create a profile from an archive
 
@@ -91,8 +92,10 @@ missing). Refuses to touch a directory that already exists.
 
 Save the portable config of NAME (default: the active profile) as a new
 snapshot. Snapshots are stored unredacted, with private permissions, in
-~/.local/share/clade/snapshots/NAME (or \$clade_data_dir). clade never
-deletes snapshots; remove old ones by hand if you want to.
+~/.local/share/clade/snapshots/NAME (or \$clade_data_dir). With
+'clade encryption on KEY' they are GPG-encrypted, and each one is checked to
+decrypt before it is kept. clade never deletes snapshots; remove old ones by
+hand if you want to.
 
   -m, --message MESSAGE   Label the snapshot"
 
@@ -100,7 +103,8 @@ deletes snapshots; remove old ones by hand if you want to.
             echo "Usage: clade history [NAME]
 
 List snapshots of NAME (default: the active profile), newest first, with
-number, ID, size and label. Use the number or ID as SNAP in diff and restore."
+number, ID, size, 'gpg' when encrypted, and label. Use the number or ID as
+SNAP in diff and restore. Listing never needs a GPG passphrase."
 
         case diff
             echo "Usage: clade diff [NAME] [SNAP]
@@ -114,10 +118,11 @@ current config. Exits 0 when identical, 1 when different, 2 on error."
 Roll NAME back to snapshot SNAP (default: 1, the newest). The current state is
 snapshotted first, so a restore can always be undone with
 'clade restore NAME 1'. Files in the snapshot are put back; files created
-since are left in place and listed."
+since are left in place and listed. An encrypted snapshot is decrypted
+first, so a missing key stops the restore before anything changes."
 
         case export
-            echo "Usage: clade export [NAME] [-o FILE] [--include-secrets]
+            echo "Usage: clade export [NAME] [-o FILE] [--sops | --include-secrets]
 
 Write NAME's portable config to a .clade.tar.gz archive (default:
 ./NAME-YYYYMMDD.clade.tar.gz). It never overwrites an existing file.
@@ -129,10 +134,17 @@ caches and plugin caches (plugins reinstall from settings.json).
 
 Env values in settings.json whose names look secret (KEY, TOKEN, SECRET,
 PASSW, CREDENTIAL, BEARER; override with \$clade_secret_pattern) are
-replaced with \"<redacted by clade>\".
+replaced with \"<redacted by clade>\", unless --sops encrypts them instead.
 
   -o, --output FILE    Where to write the archive
-  --include-secrets    Keep secret-looking env values"
+  --sops               Encrypt secret-looking values with sops rather than
+                       redacting them. Recipients come from sops's own config
+                       (SOPS_PGP_FP, SOPS_AGE_RECIPIENTS, SOPS_KMS_ARN or
+                       .sops.yaml) or \$clade_sops_args, e.g.
+                         set -U clade_sops_args --pgp FINGERPRINT
+                       clade checks every secret was encrypted before it
+                       writes the archive, which needs clade 0.3+ to import.
+  --include-secrets    Keep secret-looking env values in plain text"
 
         case import
             echo "Usage: clade import FILE [NAME] [--merge]
@@ -140,10 +152,32 @@ replaced with \"<redacted by clade>\".
 Create profile NAME (default: the name stored in FILE) from an export.
 Archives are checked first: only config paths are accepted, never links,
 absolute paths or '..'. Paths in settings.json that pointed at the exported
-profile are rewritten to the new one.
+profile are rewritten to the new one. Secrets encrypted with --sops are
+decrypted with sops, which needs a key they were encrypted to; without one,
+nothing is written.
 
   --merge   Import into an existing profile. It is snapshotted first, then
             the archive's files are laid over it; nothing else is removed."
+
+        case encryption
+            echo "Usage: clade encryption [status | on KEY... | off]
+
+Show or change GPG encryption of snapshots. Exports are encrypted separately,
+with 'clade export --sops'.
+
+  status        Keys in use, whether their private keys are here, and how
+                many snapshots are encrypted (the default)
+  on KEY...     Encrypt new snapshots to KEY (a fingerprint, key ID or
+                email). Refused unless the private key is in your keyring
+                and a test encrypt/decrypt succeeds, so you can always
+                restore. Back the key up: without it, encrypted snapshots
+                are unrecoverable.
+  off           Stop encrypting new snapshots
+
+Existing snapshots are never re-encrypted or deleted. While encryption is on,
+a snapshot fails (and so do restore and import --merge, which snapshot first)
+if no private key is available. For pinentry in a terminal, set GPG_TTY:
+  set -gx GPG_TTY (tty)"
 
         case help
             echo "Usage: clade help [COMMAND]"

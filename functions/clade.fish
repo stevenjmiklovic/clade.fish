@@ -162,9 +162,18 @@ function clade --description 'Switch, snapshot and share Claude Code profiles'
             end
             __clade_need jq; or return
             for i in (seq (count $snaps))
-                set -l label (tar -xzOf $snaps[$i] clade.json 2>/dev/null | jq -r '.label // ""' 2>/dev/null)
-                set -l size (du -h $snaps[$i] | string split -f1 \t | string trim)
-                printf '%3d  %-19s %6s  %s\n' $i (__clade_snap_id $snaps[$i]) $size "$label"
+                set -l s $snaps[$i]
+                set -l lock ''
+                set -l label
+                if string match -q -- '*.gpg' $s
+                    # Encrypted snapshots keep their label in an unencrypted sidecar, so listing never prompts.
+                    set lock gpg
+                    set label (jq -r '.label // ""' $s.json 2>/dev/null)
+                else
+                    set label (tar -xzOf $s clade.json 2>/dev/null | jq -r '.label // ""' 2>/dev/null)
+                end
+                set -l size (du -h $s | string split -f1 \t | string trim)
+                printf '%3d  %-19s %6s  %-3s  %s\n' $i (__clade_snap_id $s) $size "$lock" "$label"
             end
 
         case diff
@@ -173,7 +182,8 @@ function clade --description 'Switch, snapshot and share Claude Code profiles'
             set -l tmp (__clade_mktemp); or return
             mkdir $tmp/snapshot $tmp/current
             if not begin
-                    tar -xzf $snap -C $tmp/snapshot
+                    set -l readable (__clade_snapshot_open $snap $tmp)
+                    and tar -xzf $readable -C $tmp/snapshot
                     and __clade_pack $dir $tmp/current.tar.gz
                     and tar -xzf $tmp/current.tar.gz -C $tmp/current
                 end
@@ -193,26 +203,45 @@ function clade --description 'Switch, snapshot and share Claude Code profiles'
             set -l key (__clade_key $dir)
             set -l snap (__clade_snapshot_ref $key $argv[2]); or return
             set -l id (__clade_snap_id $snap)
+            # Decrypt first: if the key is missing, nothing has been touched yet.
+            set -l tmp (__clade_mktemp); or return
+            set -l readable (__clade_snapshot_open $snap $tmp)
+            if test $status -ne 0
+                rm -rf $tmp
+                __clade_err "nothing was restored"
+                return 1
+            end
             set -l safety (__clade_snapshot $dir "before restoring $id")
             if test $status -ne 0
+                rm -rf $tmp
                 __clade_err "could not snapshot the current state, so nothing was restored"
                 return 1
             end
-            __clade_unpack --trusted $snap $dir; or return
+            if not __clade_unpack --trusted $readable $dir
+                rm -rf $tmp
+                return 1
+            end
             echo "Restored $key to snapshot $id."
             echo "The previous state is snapshot "(__clade_snap_id $safety)"; undo with: clade restore $key 1"
-            set -l after (__clade_entries $snap)
+            set -l after (__clade_entries $readable)
             set -l kept
-            for f in (__clade_entries $safety)
+            mkdir $tmp/safety
+            set -l before (__clade_snapshot_open $safety $tmp/safety)
+            and for f in (__clade_entries $before)
                 contains -- $f $after; or set -a kept $f
             end
+            rm -rf $tmp
             if set -q kept[1]
                 echo "Kept "(count $kept)" file(s) that are newer than the snapshot (restore never deletes):"
                 printf '  %s\n' $kept
             end
 
         case export
-            argparse 'o/output=' include-secrets -- $argv; or return
+            argparse 'o/output=' include-secrets sops -- $argv; or return
+            if set -q _flag_sops; and set -q _flag_include_secrets
+                __clade_err "--sops already keeps secrets (encrypted); drop --include-secrets"
+                return 1
+            end
             set -l dir (__clade_dir (__clade_or_current $argv[1])); or return
             set -l key (__clade_key $dir)
             set -l out $key-(date +%Y%m%d).clade.tar.gz
@@ -221,10 +250,16 @@ function clade --description 'Switch, snapshot and share Claude Code profiles'
                 __clade_err "$out already exists; choose another file with -o"
                 return 1
             end
-            set -l redact --redact
-            set -q _flag_include_secrets; and set redact
-            __clade_pack --dereference $redact $dir $out; or return
-            echo "Exported $key to $out."
+            set -l secrets --redact
+            set -q _flag_include_secrets; and set secrets
+            set -q _flag_sops; and set secrets --sops
+            __clade_pack --dereference $secrets $dir $out; or return
+            set -l encrypted (tar -xzOf $out clade.json | jq -r '.sops[]?')
+            if set -q encrypted[1]
+                echo "Exported $key to $out, with "(count $encrypted)" secret value(s) encrypted by sops."
+            else
+                echo "Exported $key to $out."
+            end
 
         case import
             argparse merge -- $argv; or return
@@ -257,12 +292,34 @@ function clade --description 'Switch, snapshot and share Claude Code profiles'
                 return 1
             end
             echo "Imported $file into ~/.$name."
+            set -l decrypted (printf '%s\n' $meta | jq -r '.sops[]?')
+            set -q decrypted[1]; and echo "Decrypted "(count $decrypted)" secret value(s) with sops: "(string join ', ' $decrypted)
             set -l redacted (printf '%s\n' $meta | jq -r '.redacted[]?')
             if set -q redacted[1]
                 echo "These env values in settings.json were redacted on export; fill them in: "(string join ', ' $redacted)
             end
             test $created = 1; and echo "Switch with 'clade use $name', then run claude to log in."
             return 0
+
+        case encryption
+            set -l action status
+            if set -q argv[1]
+                set action $argv[1]
+                set -e argv[1]
+            end
+            switch $action
+                case status
+                    __clade_encryption_status
+                case on
+                    set -q argv[1]; or __clade_usage encryption; or return
+                    __clade_encryption_on $argv
+                case off
+                    set -qU clade_gpg_recipients; and set -eU clade_gpg_recipients
+                    set -qg clade_gpg_recipients; and set -eg clade_gpg_recipients
+                    echo "New snapshots will not be encrypted. Existing encrypted snapshots still need their key to be read."
+                case '*'
+                    __clade_usage encryption
+            end
 
         case '*'
             __clade_err "unknown command '$cmd' (see 'clade help')"
@@ -364,8 +421,9 @@ end
 
 # Snapshot files of a profile, newest first.
 function __clade_snapshots -a key
-    set -l files (__clade_data_dir)/snapshots/$key/*.tar.gz
-    set -q files[1]; and printf '%s\n' $files[-1..1]
+    set -l store (__clade_data_dir)/snapshots/$key
+    set -l files $store/*.tar.gz $store/*.tar.gz.gpg
+    set -q files[1]; and path sort -r -- $files
     return 0
 end
 

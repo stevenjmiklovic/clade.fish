@@ -26,7 +26,7 @@ function __clade_verify -a archive --description 'Check that a file is a well-fo
         return 1
     end
 
-    if not tar -xzOf $archive clade.json 2>/dev/null | jq -e '.format == 1' >/dev/null 2>&1
+    if not tar -xzOf $archive clade.json 2>/dev/null | jq -e '.format == 1 or .format == 2' >/dev/null 2>&1
         __clade_err "$archive is not a clade archive (missing or unsupported clade.json)"
         return 1
     end

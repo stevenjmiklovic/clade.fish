@@ -1,4 +1,4 @@
-set -l commands list ls use current path default run new snapshot history log diff restore export import help version
+set -l commands list ls use current path default run new snapshot history log diff restore encryption export import help version
 
 # True when the token being completed is the Nth positional argument after the command.
 function __clade_completing_arg -a n
@@ -12,7 +12,27 @@ function __clade_complete_snapshots
     set -l dir (__clade_dir (__clade_or_current $tokens[3]) 2>/dev/null); or return
     set -l snaps (__clade_snapshots (__clade_key $dir))
     for i in (seq (count $snaps))
-        printf '%s\t%s\n' $i (path basename -- $snaps[$i] | string replace -r '\.tar\.gz$' '')
+        printf '%s\t%s\n' $i (path basename -- $snaps[$i] | string replace -r '\.tar\.gz(\.gpg)?$' '')
+    end
+end
+
+function __clade_complete_gpg_keys
+    type -q gpg; or return
+    set -l fpr
+    set -l want 0
+    for line in (gpg --batch --with-colons --list-secret-keys 2>/dev/null)
+        switch $line
+            case 'sec:*'
+                set want 1
+            case 'fpr:*'
+                test $want = 1; and set fpr (string split -f10 : -- $line)
+                set want 0
+            case 'uid:*'
+                if test -n "$fpr"
+                    printf '%s\t%s\n' $fpr (string split -f10 : -- $line)
+                    set fpr
+                end
+        end
     end
 end
 
@@ -28,6 +48,7 @@ complete -c clade -n "not __fish_seen_subcommand_from $commands" -a snapshot -d 
 complete -c clade -n "not __fish_seen_subcommand_from $commands" -a history -d 'List snapshots'
 complete -c clade -n "not __fish_seen_subcommand_from $commands" -a diff -d 'Compare with a snapshot'
 complete -c clade -n "not __fish_seen_subcommand_from $commands" -a restore -d 'Roll back to a snapshot'
+complete -c clade -n "not __fish_seen_subcommand_from $commands" -a encryption -d 'GPG encryption of snapshots'
 complete -c clade -n "not __fish_seen_subcommand_from $commands" -a export -d 'Write config to an archive'
 complete -c clade -n "not __fish_seen_subcommand_from $commands" -a import -d 'Create a profile from an archive'
 complete -c clade -n "not __fish_seen_subcommand_from $commands" -a help -d 'Show help'
@@ -45,5 +66,8 @@ complete -c clade -n "__fish_seen_subcommand_from new" -l from -xa '(clade list 
 complete -c clade -n "__fish_seen_subcommand_from snapshot" -s m -l message -x -d 'Snapshot label'
 complete -c clade -n "__fish_seen_subcommand_from export" -s o -l output -rF -d 'Archive to write'
 complete -c clade -n "__fish_seen_subcommand_from export" -l include-secrets -d 'Keep secret-looking env values'
+complete -c clade -n "__fish_seen_subcommand_from export" -l sops -d 'Encrypt secrets with sops'
+complete -c clade -n "__fish_seen_subcommand_from encryption; and __clade_completing_arg 1" -a 'status on off'
+complete -c clade -n "__fish_seen_subcommand_from encryption; and __fish_seen_subcommand_from on" -a '(__clade_complete_gpg_keys)'
 complete -c clade -n "__fish_seen_subcommand_from import; and __clade_completing_arg 1" -F
 complete -c clade -n "__fish_seen_subcommand_from import" -l merge -d 'Overlay onto an existing profile'

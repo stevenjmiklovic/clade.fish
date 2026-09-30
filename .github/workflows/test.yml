@@ -10,6 +10,9 @@ on:
 permissions:
   contents: read
 
+env:
+  SOPS_VERSION: v3.13.3
+
 jobs:
   lint:
     name: lint
@@ -76,5 +79,18 @@ jobs:
               rm -rf "fish-$version" fish-build ;;
           esac
           fish --version
+      - name: Install gpg and sops
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            brew install gnupg sops
+          else
+            command -v gpg || { sudo apt-get update; sudo apt-get install -y gnupg; }
+            sudo curl -fsSL -o /usr/local/bin/sops "https://github.com/getsops/sops/releases/download/$SOPS_VERSION/sops-$SOPS_VERSION.linux.amd64"
+            sudo chmod +x /usr/local/bin/sops
+          fi
+          gpg --version | head -n1
+          sops --version
       - name: Run tests
+        env:
+          CLADE_REQUIRE_CRYPTO: "1"
         run: fish tests/run.fish

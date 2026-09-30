@@ -28,6 +28,7 @@ Saved snapshot 20260930T185201Z of notclaude.
 - [Profiles](#profiles)
 - [Snapshots](#snapshots)
 - [Export and import](#export-and-import)
+- [Encryption](#encryption)
 - [Safety](#safety)
 - [Configuration](#configuration)
 - [Prompt integration](#prompt-integration)
@@ -36,7 +37,7 @@ Saved snapshot 20260930T185201Z of notclaude.
 
 ## Install
 
-Requires fish 3.6 or newer (tested on 3.6, 3.7 and 4), `jq` (for snapshots, export and import), and `tar`.
+Requires fish 3.6 or newer (tested on 3.6, 3.7 and 4), `jq` (for snapshots, export and import), and `tar`. [Encryption](#encryption) is optional and needs GnuPG (for snapshots) or [sops](https://github.com/getsops/sops) 3.9 or newer (for exports).
 
 With [Oh My Fish](https://github.com/oh-my-fish/oh-my-fish):
 
@@ -89,7 +90,8 @@ Every command has built-in help: `clade help COMMAND` or `clade COMMAND -h`.
 | `clade history [NAME]` | List snapshots, newest first. |
 | `clade diff [NAME] [SNAP]` | Diff a snapshot against the current config. |
 | `clade restore NAME [SNAP]` | Roll back to a snapshot. The current state is snapshotted first. |
-| `clade export [NAME] [-o FILE] [--include-secrets]` | Write `NAME`'s config to a `.clade.tar.gz` archive. |
+| `clade encryption [on KEY... \| off]` | Show or set GPG encryption of snapshots. |
+| `clade export [NAME] [-o FILE] [--sops \| --include-secrets]` | Write `NAME`'s config to a `.clade.tar.gz` archive. `--sops` encrypts its secrets. |
 | `clade import FILE [NAME] [--merge]` | Create a profile from an archive, or merge into one. |
 | `clade help [COMMAND]` | Show help. |
 | `clade version` | Show the version. |
@@ -111,7 +113,7 @@ A snapshot is a timestamped archive of a profile's **portable config** (see belo
 ```fish
 clade snapshot work -m "before plugin cleanup"
 clade history work
-#   1  20260930T185201Z      12K  before plugin cleanup
+#   1  20260930T185201Z      12K  gpg  before plugin cleanup
 #   2  20260928T091512Z      11K
 clade diff work               # what changed since snapshot 1?
 clade restore work 2          # go back to snapshot 2
@@ -120,7 +122,7 @@ clade restore work 1          # changed your mind: snapshot 1 is now the state f
 
 - A restore takes a snapshot of the current state first, so you can always undo it.
 - A restore puts back every file in the snapshot and leaves files created since then in place. It lists those files and never deletes them.
-- Snapshots keep secrets, so they are **not** redacted. They are written with `600` permissions in a `700` directory.
+- Snapshots keep secrets, so they are **not** redacted. They are written with `600` permissions in a `700` directory, and they can be [encrypted with GPG](#encrypted-snapshots-gpg).
 - `clade` never deletes snapshots. They are ordinary files, so prune them by hand when you want to.
 - `clade diff` exits 0 when nothing changed and 1 when something did, like `diff`, so it works in scripts.
 
@@ -153,6 +155,55 @@ clade import work.clade.tar.gz work        # on another
   "home": "/Users/you", "created": "2026-09-30T18:52:01Z", "label": "", "redacted": ["MY_API_KEY"] }
 ```
 
+## Encryption
+
+clade encrypts the two places secrets end up. Each uses the tool that fits it best:
+
+- **Snapshots use GPG.** A snapshot is a whole archive that only you need to read back, so it's encrypted as one file to your own key.
+- **Exports use sops.** An export's secrets are a few values in `settings.json`. sops encrypts just those values, leaves the rest readable, and can encrypt to anyone's key: PGP, age, AWS KMS, GCP KMS, Azure Key Vault or Vault.
+
+### Encrypted snapshots (GPG)
+
+```fish
+clade encryption on you@example.com     # or a key ID or fingerprint
+clade encryption                        # status: keys, private-key check, snapshot counts
+clade encryption off
+```
+
+Once enabled, every new snapshot of every profile is saved as `…tar.gz.gpg`, including the automatic ones taken before `restore` and `import --merge`. Next to each one is a small `…tar.gz.gpg.json` file holding only the label, date and key fingerprints, so `clade history` never needs your passphrase. `clade diff` and `clade restore` decrypt into a private temporary directory and remove it afterwards. If you use pinentry in a terminal, set `GPG_TTY`: `set -gx GPG_TTY (tty)`.
+
+**The main risk is losing the key, because then the snapshots can't be recovered.** clade guards against that at every step:
+
+- **Enabling checks the key.** `encryption on` refuses a key unless its **private** key is in your keyring. It resolves the key to one exact fingerprint (an ambiguous name is refused), and a test encrypt-and-decrypt must succeed, which proves gpg-agent and any passphrase work.
+- **Enabling explains backup.** It prints the `gpg --export-secret-keys` command for backing up the key. Keep the backup somewhere other than this machine.
+- **Every snapshot is checked.** Each encrypted snapshot is decrypted and compared byte for byte with the original before it's kept. If that fails, nothing is saved.
+- **A missing key stops everything safely.** New snapshots are refused, so `restore` and `import --merge` stop before changing anything. Restoring an encrypted snapshot decrypts it first, so a missing key also stops before anything changes. `clade encryption` reports the missing key.
+- **Existing snapshots stay as they are.** They're never re-encrypted or deleted. `clade encryption` counts any left unencrypted, so you can remove them yourself.
+- **Startup never decrypts.** Shell startup and completions never call GPG, so there are no passphrase prompts where no one can answer.
+
+### Encrypted exports (sops)
+
+```fish
+set -U clade_sops_args --pgp (gpg --with-colons --list-keys you@example.com | string match -r '^fpr:.*' | head -n1 | string split -f10 :)
+clade export work --sops -o work.clade.tar.gz
+clade import work.clade.tar.gz work        # decrypts with sops; needs a key it was encrypted to
+```
+
+`--sops` replaces redaction. Values whose names look secret (see `clade_secret_pattern`) are encrypted as `ENC[…]`, and everything else stays readable, so a reviewer can still see what an archive contains. sops finds recipients in its own configuration:
+
+- the `SOPS_PGP_FP`, `SOPS_AGE_RECIPIENTS` or `SOPS_KMS_ARN` environment variables;
+- a `.sops.yaml` in the current directory or above;
+- or flags in `clade_sops_args`, such as `--pgp FPR`, `--age RECIPIENT`, `--kms ARN` or `--config FILE`.
+
+Several recipients work too, so one archive can be opened by you and a teammate.
+
+**How the risks are handled:**
+
+- **No plaintext secrets.** After encrypting, clade checks that every secret-looking value is sops ciphertext. If one isn't, or if sops fails or has no recipients, nothing is written.
+- **Older versions fail safely.** sops exports use archive format `2`, which clade 0.2 and earlier refuse as unsupported. They can't silently import encrypted placeholders.
+- **Imports are atomic.** They decrypt in a temporary directory before touching the profile. Without a suitable key, nothing is written and no profile is created. Decryption happens *before* paths are rewritten, because sops's integrity check covers the whole file.
+- **Plain when nothing is secret.** If a profile has no secret-looking values, the export stays plain (format `1`), so any recipient can import it.
+
 ## Safety
 
 `clade` is built to be non-destructive:
@@ -163,6 +214,7 @@ clade import work.clade.tar.gz work        # on another
 - **It never overwrites files.** `new` and `import` refuse existing profiles, and `export` refuses existing files. Archives are built in a temporary directory and moved into place.
 - **It checks imports before writing anything.** It rejects archives with absolute paths, `..`, symlinks, special files, or anything outside the portable config list.
 - **It leaves machine state alone.** History, sessions, projects and credentials are never read into archives or written over.
+- **Encryption can't lock you out.** Snapshot encryption only accepts keys you can decrypt with, checks every encrypted snapshot, and stops before changing anything if the key goes missing. sops exports are checked for leftover plaintext before they're written. See [Encryption](#encryption).
 - **Uninstalling keeps your data.** It removes only the `clade_default` variable, never profiles or snapshots.
 
 ## Configuration
@@ -172,7 +224,9 @@ clade import work.clade.tar.gz work        # on another
 | `clade_default` | unset (`claude`) | Profile new shells start with. Set with `clade default`. |
 | `clade_data_dir` | `$XDG_DATA_HOME/clade` or `~/.local/share/clade` | Where snapshots are stored. |
 | `clade_include` | none | Extra paths inside a profile to treat as portable config, e.g. `set -U clade_include statusline.sh`. |
-| `clade_secret_pattern` | `KEY\|TOKEN\|SECRET\|PASSW\|CREDENTIAL\|BEARER` | Case-insensitive regex for env names redacted on export. |
+| `clade_secret_pattern` | `KEY\|TOKEN\|SECRET\|PASSW\|CREDENTIAL\|BEARER` | Case-insensitive regex for env names that exports redact, or encrypt with `--sops`. |
+| `clade_gpg_recipients` | unset | GPG fingerprints that new snapshots are encrypted to. Set with `clade encryption on`. |
+| `clade_sops_args` | none | Extra `sops encrypt` flags for `export --sops`, e.g. `--pgp FPR` or `--age RECIPIENT`. |
 
 ## Prompt integration
 

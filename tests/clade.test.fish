@@ -60,7 +60,7 @@ ok "command help via -h"
 test (clade help restore)[1] = 'Usage: clade restore NAME [SNAP]'
 ok "command help via help CMD"
 set -l missing_help
-for c in list use current path default run new snapshot history diff restore export import help version
+for c in list use current path default run new snapshot history diff restore encryption export import help version
     __clade_help $c | string match -q 'Usage: clade*'; or set -a missing_help $c
 end
 not set -q missing_help[1]
@@ -229,6 +229,116 @@ build(d + "/link.tar.gz", [], link=("skills", "/etc"))
     ok "nothing escapes the profile"
 else
     echo "skip - malicious archive tests need python3" >&2
+end
+
+# --- encryption: GPG for snapshots, sops for exports
+if type -q gpg; and type -q sops
+    function new_key -a email
+        gpg --batch --pinentry-mode loopback --passphrase '' --quick-gen-key "clade test <$email>" default default never >/dev/null 2>&1
+        gpg --batch --with-colons --list-secret-keys $email | string match -r '^fpr:.*' | head -n1 | string split -f10 :
+    end
+    set -g mine (new_key mine@clade.test)
+    set -g lost (new_key lost@clade.test)
+    set -g theirs (new_key theirs@clade.test)
+    gpg --batch --yes --delete-secret-keys $theirs >/dev/null 2>&1
+
+    not quiet clade encryption on theirs@clade.test; and not set -q clade_gpg_recipients
+    ok "encryption refuses a key whose private key is not here"
+    not quiet clade encryption on nobody@clade.test
+    ok "encryption refuses an unknown key"
+    string match -q '*Back up the private key*' (clade encryption on mine@clade.test)
+    ok "encryption on explains how to back up the key"
+    test "$clade_gpg_recipients" = $mine
+    ok "encryption stores the full fingerprint"
+
+    echo '{"theme":"sealed","env":{"MY_API_KEY":"sk-123"}}' >$H/.workclaude/settings.json
+    quiet clade snapshot work -m "Sealed one"
+    set -l snap (__clade_snapshots workclaude)[1]
+    string match -q '*.tar.gz.gpg' $snap; and test -f $snap.json; and test (file_mode $snap) = 600
+    ok "snapshots are encrypted, with a private sidecar"
+    not grep -qa sk-123 $snap $snap.json
+    ok "encrypted snapshots and sidecars hide secrets"
+    string match -q '*gpg  Sealed one' (clade history work)[1]
+    ok "history lists encrypted snapshots with labels"
+    echo '{"theme":"changed"}' >$H/.workclaude/settings.json
+    set -l out (clade diff work)
+    test $status -eq 1; and string match -q '*sealed*' -- $out
+    ok "diff decrypts snapshots"
+    quiet clade restore work 1; and test (json $H/.workclaude/settings.json .theme) = sealed
+    ok "restore decrypts snapshots"
+    string match -q '*.gpg' (__clade_snapshots workclaude)[1]
+    ok "the safety snapshot is encrypted too"
+    string match -q '*private key present*' (clade encryption status)
+    ok "status checks the private key"
+    string match -q 'Stored: *encrypted, *unencrypted*' (clade encryption status)
+    ok "status counts snapshots"
+    string match -q 'Exports: *sops' (clade encryption status)[-1]
+    ok "status describes export encryption"
+
+    # Losing the key must never cost data: restores and snapshots stop before changing anything.
+    quiet clade encryption on lost@clade.test
+    quiet clade snapshot work -m "lost key"
+    gpg --batch --yes --delete-secret-keys $lost >/dev/null 2>&1
+    set -l snapshots_before (count (__clade_snapshots workclaude))
+    set -l settings_before (cat $H/.workclaude/settings.json)
+    not quiet clade restore work 1
+    ok "restore fails without the key"
+    test (count (__clade_snapshots workclaude)) -eq $snapshots_before; and test "$(cat $H/.workclaude/settings.json)" = "$settings_before"
+    ok "a failed restore changes nothing"
+    not quiet clade snapshot work
+    ok "snapshots are refused while no private key is available"
+    not quiet clade import $S/work.tar.gz work --merge
+    ok "import --merge is refused when it cannot snapshot first"
+    test (count (__clade_snapshots workclaude)) -eq $snapshots_before; and test "$(cat $H/.workclaude/settings.json)" = "$settings_before"
+    ok "refused snapshots and merges save and change nothing"
+    string match -q '*PRIVATE KEY MISSING*' (clade encryption status)
+    ok "status reports the missing key"
+    quiet clade encryption off; and not set -q clade_gpg_recipients
+    ok "encryption off"
+    quiet clade snapshot work; and string match -q '*.tar.gz' (__clade_snapshots workclaude)[1]
+    ok "snapshots are plain again after encryption off"
+
+    echo '{"theme":"dark","env":{"MY_API_KEY":"sk-123","AWS_REGION":"us-east-1"},"statusLine":{"command":"~/.workclaude/status.sh"}}' >$H/.workclaude/settings.json
+    not quiet clade export work --sops -o $S/nokeys.tar.gz; and test ! -e $S/nokeys.tar.gz
+    ok "a sops export without recipients fails and writes nothing"
+    not quiet clade export work --sops --include-secrets -o $S/both.tar.gz
+    ok "--sops and --include-secrets conflict"
+    set -gx SOPS_PGP_FP $mine
+    quiet clade export work --sops -o $S/sops.tar.gz
+    ok "sops export"
+    set -l sealed (tar -xzOf $S/sops.tar.gz settings.json | string collect)
+    string match -q 'ENC[*' (echo $sealed | jq -r .env.MY_API_KEY)
+    ok "sops encrypts secret values"
+    test (echo $sealed | jq -r .env.AWS_REGION) = us-east-1
+    ok "sops leaves other values readable"
+    test (tar -xzOf $S/sops.tar.gz clade.json | jq -c '[.format, .sops, .redacted]') = '[2,["MY_API_KEY"],[]]'
+    ok "sops exports are format 2 and record what was encrypted"
+    quiet clade import $S/sops.tar.gz sealed
+    and test (json $H/.sealedclaude/settings.json .env.MY_API_KEY) = sk-123
+    and not jq -e 'has("sops")' $H/.sealedclaude/settings.json >/dev/null
+    ok "import decrypts sops secrets"
+    test (json $H/.sealedclaude/settings.json .statusLine.command) = "~/.sealedclaude/status.sh"
+    ok "import rewrites paths after decrypting"
+    echo '{"theme":"dark"}' >$H/.personalclaude/settings.json
+    quiet clade export personal --sops -o $S/nothing-secret.tar.gz
+    and test (tar -xzOf $S/nothing-secret.tar.gz clade.json | jq .format) = 1
+    ok "a sops export with nothing secret stays format 1"
+    set -e SOPS_PGP_FP
+    gpg --batch --yes --delete-secret-keys $mine >/dev/null 2>&1
+    not quiet clade import $S/sops.tar.gz nokey; and test ! -e $H/.nokeyclaude
+    ok "a sops import without the key writes nothing"
+
+    mkdir $S/future
+    tar -xzf $S/work.tar.gz -C $S/future
+    jq '.format = 3' $S/future/clade.json >$S/future/m.json; and mv $S/future/m.json $S/future/clade.json
+    tar -C $S/future -czf $S/future.tar.gz (path basename $S/future/*)
+    not quiet clade import $S/future.tar.gz future; and test ! -e $H/.futureclaude
+    ok "unknown archive formats are refused"
+else if set -q CLADE_REQUIRE_CRYPTO
+    set failed (math $failed + 1)
+    echo "not ok - encryption tests need gpg and sops (CLADE_REQUIRE_CRYPTO is set)" >&2
+else
+    echo "skip - encryption tests need gpg and sops" >&2
 end
 
 # --- completions

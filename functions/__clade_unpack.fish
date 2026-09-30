@@ -21,6 +21,20 @@ function __clade_unpack --description 'Overlay a clade archive onto a profile di
         end
     end
 
+    # Decrypt before rewriting paths: sops's integrity check covers the plain values too.
+    if test -f $tmp/settings.json; and jq -e 'has("sops")' $tmp/settings.json >/dev/null 2>&1
+        if not __clade_need sops
+            rm -rf $tmp
+            return 1
+        end
+        if not sops decrypt --input-type json --output-type json $tmp/settings.json >$tmp/settings.plain
+            rm -rf $tmp
+            __clade_err "could not decrypt settings.json in $archive with sops; you need one of the keys it was encrypted to. Nothing was written."
+            return 1
+        end
+        mv $tmp/settings.plain $tmp/settings.json
+    end
+
     set -l source (jq -r '.source // empty' $tmp/clade.json)
     set -l home (jq -r '.home // empty' $tmp/clade.json)
     rm $tmp/clade.json

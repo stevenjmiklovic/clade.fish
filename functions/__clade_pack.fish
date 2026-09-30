@@ -1,5 +1,5 @@
 function __clade_pack --description 'Archive the portable config of a Claude profile'
-    argparse redact dereference 'label=' -- $argv; or return
+    argparse redact sops dereference 'label=' -- $argv; or return
     set -l dir $argv[1]
     set -l out $argv[2]
     __clade_need jq; or return
@@ -27,10 +27,25 @@ function __clade_pack --description 'Archive the portable config of a Claude pro
         end
     end
 
+    set -l pattern 'KEY|TOKEN|SECRET|PASSW|CREDENTIAL|BEARER'
+    test -n "$clade_secret_pattern"; and set pattern $clade_secret_pattern
     set -l redacted
+    set -l sealed
+    set -l format 1
+    if set -q _flag_sops; and test -f $tmp/settings.json
+        set sealed (__clade_sops_encrypt $tmp/settings.json $pattern)
+        switch $status
+            case 0
+                set format 2
+            case 2
+                # Nothing secret-looking to encrypt: the settings stay plain and any importer can read them.
+                __clade_err "note: no secret-looking env values in settings.json, so nothing needed sops"
+            case '*'
+                rm -rf $tmp
+                return 1
+        end
+    end
     if set -q _flag_redact; and test -f $tmp/settings.json
-        set -l pattern 'KEY|TOKEN|SECRET|PASSW|CREDENTIAL|BEARER'
-        test -n "$clade_secret_pattern"; and set pattern $clade_secret_pattern
         set redacted (jq -r --arg p $pattern '(.env // {}) | keys[] | select(test($p; "i"))' $tmp/settings.json)
         and if set -q redacted[1]
             jq --arg p $pattern '.env |= with_entries(if (.key | test($p; "i")) then .value = "<redacted by clade>" else . end)' \
@@ -48,10 +63,10 @@ function __clade_pack --description 'Archive the portable config of a Claude pro
         end
     end
 
-    jq -n --arg clade $__clade_version --arg profile (__clade_key $dir) --arg source $dir --arg home $HOME \
-        --arg created (date -u +%Y-%m-%dT%H:%M:%SZ) --arg label "$_flag_label" \
-        '{format: 1, clade: $clade, profile: $profile, source: $source, home: $home,
-          created: $created, label: $label, redacted: $ARGS.positional}' \
+    jq -n --argjson format $format --arg clade $__clade_version --arg profile (__clade_key $dir) --arg source $dir --arg home $HOME \
+        --arg created (date -u +%Y-%m-%dT%H:%M:%SZ) --arg label "$_flag_label" --arg sops "$(string join \n -- $sealed)" \
+        '{format: $format, clade: $clade, profile: $profile, source: $source, home: $home,
+          created: $created, label: $label, redacted: $ARGS.positional, sops: ($sops | split("\n") | map(select(length > 0)))}' \
         --args $redacted >$tmp/clade.json
 
     # Build inside the temp dir, then move into place without replacing anything.

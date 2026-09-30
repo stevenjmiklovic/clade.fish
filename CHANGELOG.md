@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- GPG encryption of snapshots: `clade encryption [status | on KEY... | off]`. Keys are accepted only
+  when their private key is present and a test encrypt/decrypt succeeds. Every encrypted snapshot is
+  checked to decrypt before it is kept, and labels live in an unencrypted sidecar so `history` never
+  prompts.
+- `clade export --sops` encrypts secret-looking values in `settings.json` with sops instead of
+  redacting them, and refuses to write the archive if any secret would stay in plain text. `import`
+  decrypts them, and writes nothing without a suitable key.
+- Archive format 2 for sops exports, so older clade versions refuse them rather than import encrypted
+  placeholders.
+- The Test workflow installs GnuPG and sops and requires the encryption tests to run.
+
+### Changed
+
+- `restore` decrypts an encrypted snapshot before taking its safety snapshot, so a missing key changes
+  nothing.
+- `history` shows `gpg` for encrypted snapshots.
+
 ## [0.2.0] - 2026-09-30
 
 ### Added
