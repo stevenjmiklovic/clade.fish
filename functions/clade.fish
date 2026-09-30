@@ -1,4 +1,4 @@
-set -g __clade_version 0.2.0
+set -g __clade_version 0.3.0
 
 function clade --description 'Switch, snapshot and share Claude Code profiles'
     set -l cmd list
