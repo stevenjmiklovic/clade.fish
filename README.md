@@ -39,7 +39,7 @@ omf install https://github.com/stevenjmiklovic/clade.fish
 omf update clade.fish                          # later, to upgrade
 ```
 
-OMF names a package installed from a URL after its repository, so the package is called `clade.fish` and the command is `clade`.
+OMF names a package installed from a URL after its repository, so the package is called `clade.fish` and the command is `clade`. OMF loads new packages in new shells, so open one (or run `exec fish`) after installing.
 
 With [Fisher](https://github.com/jorgebucaran/fisher):
 
